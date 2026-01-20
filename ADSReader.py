@@ -7,9 +7,8 @@ from adafruit_ads1x15.analog_in import AnalogIn
 import board,  busio
 import math
 
-import logging
-logger= logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+from Logger import get_logger
+logger = get_logger()
 
 class ADSReader:
     def __init__(self, address, gain, vcc):

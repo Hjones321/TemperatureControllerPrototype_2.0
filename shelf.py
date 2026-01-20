@@ -1,9 +1,8 @@
 import time
 from gpiozero import InputDevice, DigitalOutputDevice
 
-import logging
-logger= logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+from Logger import get_logger
+logger = get_logger()
 
 class Shelf():
     def __init__(self, relays: list, tempSensor:object, setTemp = 80) :

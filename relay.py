@@ -1,8 +1,8 @@
 from gpiozero import InputDevice, DigitalOutputDevice
 import time
-import logging
-logger= logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+from Logger import get_logger
+
+logger = get_logger()
 
 
 class Relay(DigitalOutputDevice):

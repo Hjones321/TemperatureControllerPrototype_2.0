@@ -5,9 +5,8 @@ from shelf import Shelf
 from relay import Relay
 import serial
 
-import logging
-logger= logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+from Logger import get_logger
+logger = get_logger()
 
 class DeviceManager():
     
