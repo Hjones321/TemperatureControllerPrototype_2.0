@@ -5,15 +5,29 @@ from Logger import get_logger
 logger = get_logger()
 
 class Shelf():
-    def __init__(self, relays: list, tempSensor:object, setTemp = 80) :
+    def __init__(self, relays: list, tempSensor:object, channel:int, setTemp = 80) :
         
         #default temperature setpoint
         self.setTemp = setTemp
-        
+        self.channel = channel
         self.maxTemp, self.minTemp = 95, 60
 
         #how much the temperature can go above or below the setpoint
         self.overtempAllowance, self.undertempAllowance = 0, -2
+
+        #how much above or below the setpoint the temperature goes before an alarm gets triggered
+        self.overtempAlarm, self.undertempAlarm = 10, -10
+        #how much the temperature needs to rise to confirm that the elements are working for the startup checks. 
+        self.acceptanceDiff = 5 # °C
+        #how long the system waits before it starts to check for alarms (under/overtemp alarms)
+        self.rampupTime = 1*60*60 # 1hour
+
+        #activeAlarmHolder
+        self.alarmList = {
+            "ELEMENT_ERROR": False,
+            "UNDERTEMP_ALARM": False,
+            "OVERTEMP_ALARM": False
+        }
         
         #the actual values produced from the upper and lower allowance above
         self.lowerTempBound = self.setTemp + self.undertempAllowance
@@ -21,47 +35,103 @@ class Shelf():
         
         #lists to hold the temperature sensors and the relays
         self.tempSensor = tempSensor
+        self.startTemp = self.tempSensor.readTemperature(self.channel)
+
         self.relayList = relays
         
         self.isOn = False
+
+        self.startupChecked = False
+
+        self.startTime = time.time()
+
+
+        
+    def getTime(self):
+        return time.time() - self.startTime
+        
         
     def relaysOff(self):
         for relay in self.relayList:
+            logger.info("[INFO] All relays in shelf{channel}")
             relay.off()
 
+    def setRampupTime(self, newTime):
+        #newTime is minutes, it converts it into seconds
+        self.rampupTime = newTime * 60 
+        logger.info("[INFO] New rampup time has been set")
+
     def start(self):
+        
+        logger.info("[INFO] Individual shelf has started")
         for relay in self.relayList:
             relay.on()
 
+        self.isOn = True
 
+    
+        
+    def elementOff(self):
+        for relay in self.relayList:
+            if relay.role == "element":
+                logger.debug("[DEBUG] Element off")
+                relay.off()
 
-    def startupChecks(self, temp):
+    def setStartTemp(self, temp):
+        self.startTemp = temp
+        logger.debug("[DEBUG] New start temperature has been set")
+
+    def getActiveAlarms(self):
+        return [alarm for alarm, state in self.alarmList.items() if state]
+
+    def alarmChecks(self):
         #checks to see if the sensors are all receiving inputs
-
-        startTemp = temp
-        acceptanceDiff = 1
         
+        #_______________ STARTUP CHECKS _______________ 
 
-        
+        if not self.startupChecked: 
+            if self.getTime() < 15*60:
+                if self.tempSensor.readTemperature(self.channel) > self.acceptanceDiff + self.startTemp:
+                    self.startupChecked = True
+                    logger.debug("[DEBUG] Element passed startup check")
+                    return True
+                else: 
+                    pass
+            else:
+                if self.tempSensor.readTemperature(self.channel) < self.acceptanceDiff + self.startTemp:
+                    logger.critical("[CRITICAL] Element error - switching off")
+                    
+                    self.alarmList["ELEMENT_ERROR"] = True
+                
+        #_______________ RUNTIME CHECKS _______________
 
-        #personally not a fan of this system, might be better with a current sensor
-        for relay in self.relayList:
-            #test that the relays work
-            #if they do not return False
-            relay.on()
+        if self.getTime() >= self.rampupTime:
+
+            if self.tempSensor.readTemperature(self.channel) < self.setTemp + self.undertempAlarm:
+                self.alarmList["UNDERTEMP_ALARM"] = True
+                logger.error("[ERROR] undertemperature alarm triggered")
+            elif self.tempSensor.readTemperature(self.channel) > self.setTemp + self.overtempAlarm:
+                self.alarmList["OVERTEMP_ALARM"] = True
+                logger.error("[ERROR] overtemperature alarm triggered")
             
-        time.sleep(30)
-        if self.tempSensor.read() < acceptanceDiff + startTemp:
-            time.sleep(30)
-            if self.tempSensor.read() < acceptanceDiff + startTemp:
-                logger.error("[ERROR] relay error")
-                return False
+
+                
+
+        
+
+
+        
+
+        
+       
+            
+        
+        
         
 
         
 
-        logger.debug("relay working")
-        return True
+        
         
     def setNewTemp(self, newTemp: int):
         if newTemp > self.maxTemp:
@@ -79,18 +149,18 @@ class Shelf():
 
         else:
             self.isOn = False
-            self.relaysOff()
+            self.elementOff()
         
     def control(self, temp):
         if self.isOn:    
             #if temperature goes above the upper bound, it turns the heating element off
             if temp > self.upperTempBound:
                 for relay in self.relayList:
-                    if relay.name() == "element":
+                    if relay.role == "element":
                         relay.off()
 
             #if the temperature goes below the lower bound, it turns the heating elements on
             elif temp < self.lowerTempBound:
                 for relay in self.relayList:
-                    if relay.name() == "element":
+                    if relay.role == "element":
                         relay.on()

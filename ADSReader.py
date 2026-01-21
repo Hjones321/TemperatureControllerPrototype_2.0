@@ -41,6 +41,7 @@ class ADSReader:
             "beta": beta,
             "t0_k": t0_c + 273.15
         }
+        logger.debug(f"[DEBUG] new sensor has been added - {self.sensors[channel]}")
         
         
         
@@ -59,6 +60,7 @@ class ADSReader:
         
 
         rFixed = cfg["r_fixed"]
+        logger.info(f"[INFO] Read Resistance - {rFixed * (vOut / (self.vcc - vOut))} Ω")
         return rFixed * (vOut / (self.vcc - vOut))
 
     def readTemperature(self, channel):

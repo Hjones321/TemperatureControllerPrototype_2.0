@@ -8,7 +8,7 @@ logger = get_logger()
 class Relay(DigitalOutputDevice):
     def __init__(self, pinNumber: int, name:str):
         super().__init__(pinNumber)
-        self.name = name.lower()
+        self.role = name.lower()
         
 
         logger.debug(f"Relay {name} has been made")
