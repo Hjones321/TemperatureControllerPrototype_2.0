@@ -56,11 +56,15 @@ def mainLoop():
     t = threading.Thread(target=barcodeReader, daemon= True)
     t.start()
     logger.debug("[DEBUG] Barcode input handler thread started")
+    time.sleep(2)
     while running:
+        
+        try:
+            if barcodeValue:
+                handleBarcodeInput(barcodeValue)
+        except Exception as e:
+            logger.warning(f"[WARNING] ")
 
-        if barcodeValue:
-            handleBarcodeInput(barcodeValue)
-            
 
         read()
         time.sleep(1)
