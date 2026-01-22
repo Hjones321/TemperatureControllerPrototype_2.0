@@ -1,8 +1,12 @@
 import time
 from gpiozero import InputDevice, DigitalOutputDevice
 
+from alarm import Alarm
+
 from Logger import get_logger
 logger = get_logger()
+
+
 
 class Shelf():
     def __init__(self, relays: list, tempSensor:object, channel:int, setTemp = 80) :
@@ -24,9 +28,9 @@ class Shelf():
 
         #activeAlarmHolder
         self.alarmList = {
-            "ELEMENT_ERROR": False,
-            "UNDERTEMP_ALARM": False,
-            "OVERTEMP_ALARM": False
+            "ELEMENT_ERROR": Alarm("ELEMENT_ERROR", "critical", "Heating element did not warmup on startup"),
+            "UNDERTEMP_ALARM": Alarm("UNDERTEMP", "error", "Shelf temperature too low"),
+            "OVERTEMP_ALARM": Alarm("OVERTEMP", "error", "Shelf temperature too high")
         }
         
         #the actual values produced from the upper and lower allowance above
@@ -81,8 +85,7 @@ class Shelf():
         self.startTemp = temp
         logger.debug("[DEBUG] New start temperature has been set")
 
-    def getActiveAlarms(self):
-        return [alarm for alarm, state in self.alarmList.items() if state]
+    
 
     def alarmChecks(self):
         #checks to see if the sensors are all receiving inputs
@@ -99,21 +102,23 @@ class Shelf():
                     pass
             else:
                 if self.tempSensor.readTemperature(self.channel) < self.acceptanceDiff + self.startTemp:
-                    logger.critical("[CRITICAL] Element error - switching off")
                     
-                    self.alarmList["ELEMENT_ERROR"] = True
+                    self.alarmList["ELEMENT_ERROR"].trigger()
+                    
                 
         #_______________ RUNTIME CHECKS _______________
 
         if self.getTime() >= self.rampupTime:
 
             if self.tempSensor.readTemperature(self.channel) < self.setTemp + self.undertempAlarm:
-                self.alarmList["UNDERTEMP_ALARM"] = True
-                logger.error("[ERROR] undertemperature alarm triggered")
-            elif self.tempSensor.readTemperature(self.channel) > self.setTemp + self.overtempAlarm:
-                self.alarmList["OVERTEMP_ALARM"] = True
-                logger.error("[ERROR] overtemperature alarm triggered")
-            
+                self.alarmList["UNDERTEMP_ALARM"].trigger()
+            else:
+                self.alarmList["UNDERTEMP_ALARM"].clear()
+                
+            if self.tempSensor.readTemperature(self.channel) > self.setTemp + self.overtempAlarm:
+                self.alarmList["OVERTEMP_ALARM"].trigger()
+            else:
+                self.alarmList["OVERTEMP_ALARM"].clear()
 
                 
 

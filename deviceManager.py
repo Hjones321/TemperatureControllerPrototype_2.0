@@ -41,10 +41,17 @@ class DeviceManager():
     def getActiveAlarms(self):
         alarms = {}
         for index, shelf in enumerate(self.shelves):
-            if shelf.getActiveAlarms():
-                alarms[index] = shelf.getActiveAlarms()
-
+            active = []
+            for alarm in shelf.alarms.values():
+                if alarm.isActive():
+                    active.append(alarm)
+            if active:
+                alarms[index] = active
         return alarms
+    
+    def notifyOperator(index, alarm):
+        #handle the alarms
+        pass
     
     def start(self):
         self.unitOn = True
@@ -89,19 +96,14 @@ class DeviceManager():
         self.alarmChecks()
         
         alarms = self.getActiveAlarms()
-        
-        if alarms:
-            #handle what to do when theres an active alarm, below is an example of what alarms might look like for the sake of coming back to it later. i want it to be like, you have x alarms in shelf 1, x in 2, x in 3 and so on and so forth 
-            logger.warning(f"[WARNING] alarms currently active - {alarms}")
 
-            """
-            alarms = {
-            0: [ELEMENT_ERROR, OVERTEMP_ALARM, UNDERTEMP_ALARM],
-            2: [OVERTEMP_ALARM],
-            3: [UNDERTEMP_ALARM]
-            }
-            """
-            pass
+        for shelfIndex, alarmList in alarms.items():
+            for alarm in alarmList:
+                if not alarm.notified:
+                    self.notifyOperator(shelfIndex, alarm)
+                    alarm.notified = True
+        
+        
         
         temps = []
         for channel, shelf in enumerate(self.shelves):
