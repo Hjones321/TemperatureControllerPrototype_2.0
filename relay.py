@@ -7,7 +7,7 @@ logger = get_logger()
 
 class Relay(DigitalOutputDevice):
     def __init__(self, pinNumber: int, name:str):
-        super().__init__(pinNumber)
+        super().__init__(pinNumber, active_high=False)
         self.role = name.lower()
         
 

@@ -41,7 +41,7 @@ class ADSReader:
             "beta": beta,
             "t0_k": t0_c + 273.15
         }
-        logger.debug(f"[DEBUG] new sensor has been added - {self.sensors[channel]}")
+        logger.debug(f"New sensor has been added - {self.sensors[channel]}")
         
         
         
@@ -56,18 +56,19 @@ class ADSReader:
 
         #stops dividing by zero
         if vOut <=0.001 or vOut >= self.vcc:
+            logger.warning(f"Channel {channel} voltage out of range: {vOut:.4f}V - returning None")
             return None
         
 
         rFixed = cfg["r_fixed"]
-        logger.info(f"[INFO] Read Resistance - {rFixed * (vOut / (self.vcc - vOut))} Ω")
+       
         return rFixed * (vOut / (self.vcc - vOut))
 
     def readTemperature(self, channel):
 
         if channel not in self.sensors:
-            logger.error(f"[ERROR] Channel {channel} has no thermistor configured")
-        
+            logger.error(f"Channel {channel} has no thermistor configured")
+            return None
         r = self.readResistance(channel)
         
         if r is None:
