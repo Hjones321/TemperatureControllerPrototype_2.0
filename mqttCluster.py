@@ -1,20 +1,40 @@
 from paho.mqtt import client as mqtt
-import time, ssl, json
+import time, ssl, json, uuid
 from Logger import get_logger
 import threading
 import os
 
-from datetime import datetime
+from datetime import datetime, timezone
+
+
+_ALARM_TYPE_MAP = {
+    "UNDERTEMP_ALARM": ("TEMP_LOW",      "Under Temp Alarm"),
+    "OVERTEMP_ALARM":  ("TEMP_HIGH",     "Over Temp Alarm"),
+    "ELEMENT_ERROR":   ("ELEMENT_ERROR", "Element Error"),
+    "ADS_ALARM":       ("SENSOR_ERROR",  "ADS Sensor Error"),
+}
+
+_SEVERITY_PRIORITY = {
+    "critical": "100",
+    "error":    "200",
+}
+
+def _utc_ms_str(ts=None):
+    dt = datetime.fromtimestamp(ts, tz=timezone.utc) if ts else datetime.now(timezone.utc)
+    return dt.strftime("%Y-%m-%dT%H:%M:%S.") + f"{dt.microsecond // 1000:03d}Z"
 
 
 class MQTTHandler:
     logger = get_logger()
-    def __init__(self, messageHandler, onEspConnect,onLaptopConnect, broker, port, username, password, ws=False):
+    def __init__(self, messageHandler, onEspConnect, onLaptopConnect, broker, port, username, password,
+                 storeId, serialNum, ws=False):
         self.messageHandler = messageHandler
         self.port = port
         self.broker = broker
         self.username = username
         self.password = password
+        self.storeId = storeId
+        self.serialNum = serialNum
         
 
         if ws:
@@ -136,14 +156,29 @@ class MQTTHandler:
 
 
     def publishAlarm(self, shelfIndex, alarm, qos=1):
+        alarm_type, alarm_display = _ALARM_TYPE_MAP.get(alarm.name, (alarm.name, alarm.name))
         payload = {
-            "shelf": shelfIndex,
-            "name": alarm.name,
-            "active": alarm.isActive(),
-            "acknowledged": alarm.acknowledged,
-            "severity": alarm.severity,
-            "description": alarm.description,
-            "timestamp": alarm.timestamp,
-            "clearedTimestamp": alarm.clearedTimestamp
+            "version": "1.0",
+            "messageType": "alarm",
+            "messageTime": _utc_ms_str(),
+            "messages": [
+                {
+                    "eventId": str(uuid.uuid4()),
+                    "tenantId": "flexeserve",
+                    "siteId": self.storeId,
+                    "assetType": "Test Unit",
+                    "assetSubtype": "Hot Food Holding Unit",
+                    "assetClassification": "",
+                    "source": {
+                        "system": "flexeserve",
+                        "id": f"{self.serialNum}:Flexeserve Middle:Zone {shelfIndex + 1}"
+                    },
+                    "type": alarm_type,
+                    "alarmName": alarm_display,
+                    "priority": _SEVERITY_PRIORITY.get(alarm.severity, "100"),
+                    "eventTime": _utc_ms_str(alarm.timestamp)
+                }
+            ]
         }
-        self.client.publish("pi/alarms", json.dumps(payload), qos=qos, retain=False)
+        topic = f"flexeserve/store/{self.storeId}/commander/{self.serialNum}/alarm"
+        self.client.publish(topic, json.dumps(payload), qos=qos, retain=False)

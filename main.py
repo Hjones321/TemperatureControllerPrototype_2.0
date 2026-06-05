@@ -3,9 +3,11 @@ from Logger import get_logger
 from deviceManager import DeviceManager as deviceManager
 import threading
 from evdev import ecodes
-import evdev 
+import evdev
 from dotenv import load_dotenv
 import os
+import uuid as _uuid
+import hashlib
 from mqttCluster import MQTTHandler
 import queue
 
@@ -29,6 +31,14 @@ BROKER = os.environ.get("MQTT_BROKER")
 PORT= 8883
 USER = os.environ.get("MQTT_USER")
 PASS = os.environ.get("MQTT_PASS")
+STORE_ID = os.environ.get("STORE_ID", "00001")
+
+def _derive_serial():
+    mac = _uuid.getnode()
+    h = hashlib.sha256(mac.to_bytes(6, byteorder='big')).hexdigest().upper()
+    return f"{h[0:6]}.{h[6:9]}-{h[9:16]}-{h[16:21]}"
+
+SERIAL_NUM = os.environ.get("SERIAL_NUM") or _derive_serial()
 
 INFLUX_URL = os.environ.get("INFLUX_URL")
 INFLUX_TOKEN = os.environ.get("INFLUX_TOKEN")
@@ -175,12 +185,14 @@ def onEspConnect():
 
 mqtt = MQTTHandler(
     messageHandler=onPiCommand,
-    onEspConnect= onEspConnect,
-    onLaptopConnect= onLaptopConnect,
-    broker= BROKER,
-    port= PORT,
-    username= USER,
-    password= PASS,
+    onEspConnect=onEspConnect,
+    onLaptopConnect=onLaptopConnect,
+    broker=BROKER,
+    port=PORT,
+    username=USER,
+    password=PASS,
+    storeId=STORE_ID,
+    serialNum=SERIAL_NUM,
 )
 
 KEYMAP = {
